@@ -1,0 +1,30 @@
+sweeping radius (radius policy)
+  radius=10       101.00 +/- 41.08 tasks/h  waste=0.781
+  radius=20        99.20 +/- 46.75 tasks/h  waste=0.783
+  radius=30        96.80 +/- 42.65 tasks/h  waste=0.786
+  radius=40       101.60 +/- 40.22 tasks/h  waste=0.767
+  radius=60       104.20 +/- 37.85 tasks/h  waste=0.774
+  radius=90       104.20 +/- 37.46 tasks/h  waste=0.766
+sweeping eta_threshold (eta policy)
+  eta_threshold=5         96.60 +/- 50.97 tasks/h  waste=0.786
+  eta_threshold=10       104.60 +/- 37.87 tasks/h  waste=0.771
+  eta_threshold=20        99.00 +/- 42.38 tasks/h  waste=0.782
+  eta_threshold=30       109.00 +/- 32.86 tasks/h  waste=0.761
+  eta_threshold=45       101.00 +/- 38.39 tasks/h  waste=0.784
+  eta_threshold=70       107.20 +/- 40.23 tasks/h  waste=0.762
+sweeping lease_duration (lease policy)
+  lease_duration=60         6.40 +/-  4.78 tasks/h  waste=0.698
+  lease_duration=120       22.20 +/-  9.43 tasks/h  waste=0.702
+  lease_duration=180       58.60 +/- 22.17 tasks/h  waste=0.644
+  lease_duration=300       83.20 +/- 36.56 tasks/h  waste=0.631
+  lease_duration=450       90.80 +/- 36.64 tasks/h  waste=0.676
+  lease_duration=600      108.80 +/- 36.98 tasks/h  waste=0.750
+
+======================================================================
+SWEEP OPTIMA
+======================================================================
+         radius: best 60 at 104.20 tasks/h  (worst 30 at 96.80)
+  eta_threshold: best 30 at 109.00 tasks/h  (worst 5 at 96.60)
+ lease_duration: best 600 at 108.80 tasks/h  (worst 60 at 6.40)
+
+Wrote sweep.csv to results/

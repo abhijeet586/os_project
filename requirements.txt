@@ -1,0 +1,19 @@
+# Pinned so a rerun reproduces the published numbers exactly.
+# Python 3.11+ required (3.12.14 used for the reported results).
+
+# --- simulation core ---
+numpy==2.5.2
+
+# --- analysis and figures ---
+scipy==1.18.1
+matplotlib==3.11.1
+
+# --- visualization (not needed for headless runs or experiments) ---
+pygame==2.6.1
+
+# --- development ---
+pytest==9.1.1
+mypy==2.3.1
+scipy-stubs==1.18.1.0
+ruff==0.16.5
+black==26.5.1

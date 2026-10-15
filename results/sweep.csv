@@ -1,0 +1,20 @@
+# SimConfig: {"battery_drain_rate": 0.0015, "dt": 0.05, "duration": 3600.0, "eta_threshold": 30.0, "grid_height": 70, "grid_width": 100, "lease_duration": 300.0, "max_deferrals": 5, "obstacle_density": 0.12, "policy": "null", "radius": 40.0, "resource_counts": [["crane", 6], ["elevator", 6], ["dock", 8]], "robot_count": 24, "robot_speed": 1.5, "seed": 42, "service_duration_mean": 18.0, "task_arrival_rate": 0.1}
+parameter,value,policy,throughput_per_hour,throughput_ci95_half_width,held_but_unused_fraction,wait_p95_s,n_seeds
+radius,10.0,radius,101.0,41.0783,0.780631,1600.104,5
+radius,20.0,radius,99.2,46.7516,0.783011,1593.2145,5
+radius,30.0,radius,96.8,42.6471,0.786321,1572.49,5
+radius,40.0,radius,101.6,40.2211,0.766681,1583.446,5
+radius,60.0,radius,104.2,37.8494,0.773712,1371.51,5
+radius,90.0,radius,104.2,37.4604,0.766432,1539.94,5
+eta_threshold,5.0,eta,96.6,50.9733,0.785869,1755.9915,5
+eta_threshold,10.0,eta,104.6,37.8718,0.770793,1689.5905,5
+eta_threshold,20.0,eta,99.0,42.3806,0.782372,1475.3885,5
+eta_threshold,30.0,eta,109.0,32.8631,0.760588,1542.043,5
+eta_threshold,45.0,eta,101.0,38.3913,0.784154,1407.524,5
+eta_threshold,70.0,eta,107.2,40.2288,0.762255,1393.0035,5
+lease_duration,60.0,lease,6.4,4.7768,0.697984,84.88,5
+lease_duration,120.0,lease,22.2,9.4317,0.701724,1115.471,5
+lease_duration,180.0,lease,58.6,22.1699,0.644038,1041.392,5
+lease_duration,300.0,lease,83.2,36.5648,0.631427,1233.981,5
+lease_duration,450.0,lease,90.8,36.6386,0.675842,1137.551,5
+lease_duration,600.0,lease,108.8,36.9841,0.749627,1283.0355,5

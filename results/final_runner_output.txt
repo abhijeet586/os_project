@@ -1,0 +1,80 @@
+findfont: Failed to find font weight semibold, now using 700.
+findfont: Failed to find font weight medium, now using 400.
+findfont: Failed to find font weight semibold, now using 700.
+seed 1: 367 tasks arrive over 3600s
+    null:   82.00 tasks/h  waste=0.809  p95_wait= 1725.8s  forced= 131  unsafe=   0
+  radius:   88.00 tasks/h  waste=0.796  p95_wait= 2267.5s  forced= 160  unsafe=   0
+     eta:  102.00 tasks/h  waste=0.775  p95_wait= 1458.6s  forced= 190  unsafe=   0
+   lease:   63.00 tasks/h  waste=0.606  p95_wait= 1237.3s  forced= 147  unsafe=  28
+seed 2: 380 tasks arrive over 3600s
+    null:   88.00 tasks/h  waste=0.820  p95_wait= 1945.5s  forced= 122  unsafe=   1
+  radius:  113.00 tasks/h  waste=0.775  p95_wait= 1355.6s  forced= 204  unsafe=   0
+     eta:  115.00 tasks/h  waste=0.775  p95_wait= 1630.9s  forced= 205  unsafe=   0
+   lease:  101.00 tasks/h  waste=0.652  p95_wait=  980.1s  forced=2765  unsafe=2595
+seed 3: 352 tasks arrive over 3600s
+    null:  156.00 tasks/h  waste=0.676  p95_wait=  944.5s  forced= 166  unsafe=   0
+  radius:  152.00 tasks/h  waste=0.663  p95_wait=  929.4s  forced= 233  unsafe=   0
+     eta:  151.00 tasks/h  waste=0.688  p95_wait= 1076.1s  forced= 239  unsafe=   0
+   lease:  125.00 tasks/h  waste=0.579  p95_wait= 1110.6s  forced= 162  unsafe=  17
+seed 4: 372 tasks arrive over 3600s
+    null:   97.00 tasks/h  waste=0.758  p95_wait= 1358.0s  forced= 152  unsafe=   0
+  radius:   87.00 tasks/h  waste=0.778  p95_wait= 1417.0s  forced= 163  unsafe=   0
+     eta:   96.00 tasks/h  waste=0.754  p95_wait= 1435.6s  forced= 191  unsafe=   0
+   lease:   53.00 tasks/h  waste=0.570  p95_wait= 1731.3s  forced=6601  unsafe=6497
+seed 5: 359 tasks arrive over 3600s
+    null:  102.00 tasks/h  waste=0.768  p95_wait= 1690.6s  forced= 143  unsafe=   0
+  radius:   68.00 tasks/h  waste=0.822  p95_wait= 1947.8s  forced= 129  unsafe=   0
+     eta:   81.00 tasks/h  waste=0.811  p95_wait= 2109.1s  forced= 159  unsafe=   0
+   lease:   74.00 tasks/h  waste=0.750  p95_wait= 1110.5s  forced= 326  unsafe= 138
+seed 6: 345 tasks arrive over 3600s
+    null:  127.00 tasks/h  waste=0.687  p95_wait= 1325.5s  forced= 173  unsafe=   0
+  radius:  124.00 tasks/h  waste=0.702  p95_wait= 1383.2s  forced= 210  unsafe=   0
+     eta:  125.00 tasks/h  waste=0.684  p95_wait= 1480.0s  forced= 211  unsafe=   0
+   lease:  100.00 tasks/h  waste=0.567  p95_wait= 1157.0s  forced= 366  unsafe= 225
+seed 7: 375 tasks arrive over 3600s
+    null:   84.00 tasks/h  waste=0.769  p95_wait= 1448.2s  forced= 134  unsafe=   0
+  radius:   58.00 tasks/h  waste=0.838  p95_wait= 2234.8s  forced= 119  unsafe=   1
+     eta:   70.00 tasks/h  waste=0.801  p95_wait= 2368.9s  forced= 147  unsafe=   0
+   lease:   50.00 tasks/h  waste=0.473  p95_wait= 1641.3s  forced=9446  unsafe=9389
+seed 8: 373 tasks arrive over 3600s
+    null:  113.00 tasks/h  waste=0.766  p95_wait= 1472.0s  forced= 159  unsafe=   0
+  radius:  113.00 tasks/h  waste=0.767  p95_wait= 1371.5s  forced= 194  unsafe=   0
+     eta:  119.00 tasks/h  waste=0.763  p95_wait= 1080.4s  forced= 216  unsafe=   0
+   lease:   72.00 tasks/h  waste=0.757  p95_wait= 1245.7s  forced= 556  unsafe= 411
+seed 9: 376 tasks arrive over 3600s
+    null:  114.00 tasks/h  waste=0.738  p95_wait= 1179.9s  forced= 151  unsafe=   0
+  radius:  121.00 tasks/h  waste=0.706  p95_wait= 1224.6s  forced= 204  unsafe=   0
+     eta:  121.00 tasks/h  waste=0.693  p95_wait= 1163.6s  forced= 210  unsafe=   0
+   lease:   79.00 tasks/h  waste=0.572  p95_wait= 1121.0s  forced= 661  unsafe= 554
+seed 10: 383 tasks arrive over 3600s
+    null:   97.00 tasks/h  waste=0.768  p95_wait= 2108.8s  forced= 142  unsafe=   0
+  radius:   66.00 tasks/h  waste=0.864  p95_wait= 1983.6s  forced= 123  unsafe=   0
+     eta:   71.00 tasks/h  waste=0.855  p95_wait= 1911.4s  forced= 132  unsafe=   0
+   lease:   62.00 tasks/h  waste=0.632  p95_wait= 1280.1s  forced= 179  unsafe=  38
+seed 11: 346 tasks arrive over 3600s
+    null:  113.00 tasks/h  waste=0.739  p95_wait= 1400.5s  forced= 156  unsafe=   0
+  radius:  103.00 tasks/h  waste=0.769  p95_wait= 1741.4s  forced= 187  unsafe=   0
+     eta:   95.00 tasks/h  waste=0.774  p95_wait= 1453.1s  forced= 179  unsafe=   0
+   lease:   59.00 tasks/h  waste=0.749  p95_wait= 1598.8s  forced=1201  unsafe=1067
+seed 12: 380 tasks arrive over 3600s
+    null:  115.00 tasks/h  waste=0.753  p95_wait= 1390.8s  forced= 164  unsafe=   0
+  radius:  110.00 tasks/h  waste=0.755  p95_wait= 1121.3s  forced= 186  unsafe=   0
+     eta:  117.00 tasks/h  waste=0.733  p95_wait= 1171.0s  forced= 202  unsafe=   0
+   lease:   65.00 tasks/h  waste=0.510  p95_wait= 1474.7s  forced= 434  unsafe= 348
+
+==============================================================================
+RESULTS over 12 seeds (mean +/- 95% CI)
+==============================================================================
+  policy           throughput/h     held   unused   p95 wait   forced
+------------------------------------------------------------------------------
+    null    107.33 +/- 13.17       0.978    0.754    1499.2s    149.4
+  radius    100.25 +/- 17.58       0.978    0.770    1581.5s    176.0
+     eta    105.25 +/- 15.28       0.977    0.759    1528.2s    190.1
+   lease     75.25 +/- 14.34       0.948    0.618    1307.4s   1903.7
+------------------------------------------------------------------------------
+
+Highest throughput: null at 107.33 tasks/h, +2.08 (+2.0%) over eta.
+  Confidence intervals OVERLAP, so this ranking is NOT statistically supported.
+
+Wrote 48 run CSVs, all_runs.csv and summary.csv to results/
+Rendered 10 figures to results/
