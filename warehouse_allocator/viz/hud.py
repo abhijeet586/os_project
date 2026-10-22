@@ -136,6 +136,20 @@ class Hud:
         )
         y += 8
 
+        if hasattr(simulation.policy, "last_contention"):
+            pol = simulation.policy
+            contention_pct = pol.last_contention * 100.0
+            y = self._line(origin_x, y, "-- ADAPTIVE GOVERNOR --", heading=True)
+            y = self._line(origin_x, y, f"regime      {pol.last_regime.upper()}", ACCENT)
+            bar_len = min(10, int(pol.last_contention * 10))
+            bar_str = "[" + "#" * bar_len + "." * (10 - bar_len) + "]"
+            y = self._line(origin_x, y, f"contention  {bar_str} {contention_pct:4.1f}%")
+            if pol.last_threshold < 9999.0:
+                y = self._line(origin_x, y, f"eta cutoff  {pol.last_threshold:8.1f} s")
+            else:
+                y = self._line(origin_x, y, "eta cutoff  UNRESTRICTED")
+            y += 8
+
         y = self._line(origin_x, y, "-- PARAMETERS --", heading=True)
         y = self._line(origin_x, y, f"radius      {controls.radius:8.1f} m")
         y = self._line(origin_x, y, f"eta thresh  {controls.eta_threshold:8.1f} s")

@@ -22,11 +22,12 @@ from dataclasses import dataclass
 from enum import Enum
 
 from warehouse_allocator.core.clock import SimClock
-from warehouse_allocator.core.entities import Resource, Robot
+from warehouse_allocator.core.entities import Resource, Robot, RobotState
 from warehouse_allocator.core.geometry import euclidean_distance, path_cost
 from warehouse_allocator.core.world import World
 
 __all__ = [
+    "AdaptivePolicy",
     "AdmissionDecision",
     "AdmissionPolicy",
     "ETAPolicy",
@@ -318,6 +319,163 @@ class LeasePolicy(AdmissionPolicy):
         return f"lease(d={self.duration:.0f}s)"
 
 
+
+class AdaptivePolicy(AdmissionPolicy):
+    """Closed-loop contention feedback governor with starvation-free aging.
+
+    Synthesizes the advantages of classical and spatial policies:
+    1. Slack Regime (Contention < threshold): behaves liberally like NullPolicy,
+       allowing pipeline saturation when resources are not contested.
+    2. Congested Regime (Contention >= threshold): modulates admission threshold
+       dynamically using true A* path cost (ETAPolicy), tightening the threshold
+       as contention increases to prevent early-binding lock hoarding.
+    3. Anti-Starvation Aging: discounts effective ETA proportional to wait time,
+       providing a formal upper bound on deferred wait times.
+    4. Feasible Slack Leases: attaches dynamic arrival deadlines scaled to actual
+       travel time + slack buffer, preventing lease thrashing while bounding idle holding.
+
+    Attributes:
+        base_eta: Maximum ETA threshold when entering congested mode.
+        slack_threshold: Contention ratio below which admission is liberal.
+        aging_rate: Discount rate applied to ETA per second of accumulated wait.
+        lease_slack: Safety margin added to ETA for feasible leases.
+        enable_leases: Whether to attach arrival deadlines.
+    """
+
+    name = "adaptive"
+
+    __slots__ = (
+        "_ema_contention",
+        "_first_deferred",
+        "aging_rate",
+        "base_eta",
+        "enable_leases",
+        "last_contention",
+        "last_regime",
+        "last_threshold",
+        "lease_slack",
+        "slack_threshold",
+    )
+
+    def __init__(
+        self,
+        base_eta: float = 45.0,
+        slack_threshold: float = 0.35,
+        aging_rate: float = 0.5,
+        lease_slack: float = 30.0,
+        enable_leases: bool = True,
+    ) -> None:
+        """Initialize the adaptive policy.
+
+        Args:
+            base_eta: Maximum ETA threshold in seconds under moderate congestion.
+            slack_threshold: Contention ratio separating slack and congested regimes.
+            aging_rate: Simulated seconds of ETA discount awarded per simulated second of wait.
+            lease_slack: Grace margin in simulated seconds added to estimated arrival time.
+            enable_leases: Whether to issue dynamic feasible leases upon grant.
+        """
+        self.base_eta = base_eta
+        self.slack_threshold = slack_threshold
+        self.aging_rate = aging_rate
+        self.lease_slack = lease_slack
+        self.enable_leases = enable_leases
+        self._ema_contention = 0.0
+        self._first_deferred: dict[tuple[int, ResourceClass], float] = {}
+        self.last_regime = "slack"
+        self.last_contention = 0.0
+        self.last_threshold = float("inf")
+
+    def should_admit(
+        self, robot: Robot, resource: Resource, world: World, clock: SimClock
+    ) -> AdmissionDecision:
+        """Admit or defer based on closed-loop contention feedback and aged ETA.
+
+        Args:
+            robot: The requesting robot.
+            resource: The candidate resource.
+            world: Supplies geometry and resource occupancy.
+            clock: Current simulation clock.
+
+        Returns:
+            The admission decision with dynamic lease deadline if admitted.
+        """
+        now = clock.now()
+
+        # 1. True bottleneck contention: unreached lock ratio weighted by waiting queue pressure.
+        # If no robots are blocked, transit reservations are benign pipeline saturation.
+        # If robots are waiting while resources sit locked and empty, that is harmful early binding.
+        held = sum(1 for r in world.resources if r.holders)
+        unreached = sum(1 for r in world.resources if r.held_but_unused)
+        waiting = sum(1 for r in world.robots if r.state is RobotState.WAITING)
+        queue_pressure = waiting / max(len(world.robots), 1)
+        instant_contention = queue_pressure * (unreached / max(held, 1))
+
+        # 2. Smooth via Exponential Moving Average (EMA) to avoid high-frequency jitter
+        self._ema_contention = 0.85 * self._ema_contention + 0.15 * instant_contention
+        self.last_contention = self._ema_contention
+
+        # 3. Path cost & True ETA
+        cost = path_cost(world.grid, robot.cell, resource.cell)
+        if cost is None:
+            return AdmissionDecision(Verdict.DEFER, "no path to resource")
+        true_eta = cost / world.config.robot_speed
+
+        # 4. Anti-Starvation Aging Gradient
+        req_key = (robot.robot_id, resource.resource_class)
+        first_time = self._first_deferred.setdefault(req_key, now)
+        wait_time = max(0.0, now - first_time)
+        effective_eta = max(0.0, true_eta - (self.aging_rate * wait_time))
+
+        # 5. Dual-Regime Decision
+        if self._ema_contention < self.slack_threshold:
+            self.last_regime = "slack"
+            self.last_threshold = float("inf")
+            self._first_deferred.pop(req_key, None)
+            deadline = (now + true_eta + self.lease_slack) if (self.enable_leases and robot.state is not RobotState.WAITING) else None
+            return AdmissionDecision(
+                Verdict.ADMIT,
+                f"slack regime (contention={self._ema_contention:.2f})",
+                lease_deadline=deadline,
+            )
+
+        # Congested regime: Dynamic threshold shrinks as contention escalates
+        self.last_regime = "congested"
+        penalty = min(
+            1.0,
+            (self._ema_contention - self.slack_threshold)
+            / max(0.01, 1.0 - self.slack_threshold),
+        )
+        dynamic_threshold = self.base_eta * (1.0 - 0.6 * penalty)
+        self.last_threshold = dynamic_threshold
+
+        if effective_eta <= dynamic_threshold:
+            self._first_deferred.pop(req_key, None)
+            deadline = (now + true_eta + self.lease_slack) if (self.enable_leases and robot.state is not RobotState.WAITING) else None
+            reason = (
+                f"congested admit: eta {true_eta:.1f}s (aged {effective_eta:.1f}s) "
+                f"<= {dynamic_threshold:.1f}s"
+            )
+            return AdmissionDecision(
+                Verdict.ADMIT,
+                reason,
+                lease_deadline=deadline,
+            )
+
+        return AdmissionDecision(
+            Verdict.DEFER,
+            f"congested defer: eta {true_eta:.1f}s (aged {effective_eta:.1f}s) "
+            f"> {dynamic_threshold:.1f}s (contention={self._ema_contention:.2f})",
+        )
+
+    def describe(self) -> str:
+        """Return the policy name and its current operational regime.
+
+        Returns:
+            A short description for display.
+        """
+        return f"adaptive(regime={self.last_regime}, rho={self.last_contention:.2f})"
+
+
 def build_policy(
     name: str,
     *,
@@ -328,9 +486,9 @@ def build_policy(
     """Construct a policy by name.
 
     Args:
-        name: One of ``null``, ``radius``, ``eta``, ``lease``.
+        name: One of ``null``, ``radius``, ``eta``, ``lease``, ``adaptive``.
         radius: Threshold for :class:`RadiusPolicy`.
-        eta_threshold: Threshold for :class:`ETAPolicy`.
+        eta_threshold: Threshold for :class:`ETAPolicy` or base ETA for :class:`AdaptivePolicy`.
         lease_duration: Duration for :class:`LeasePolicy`.
 
     Returns:
@@ -348,7 +506,14 @@ def build_policy(
             return ETAPolicy(eta_threshold)
         case "lease":
             return LeasePolicy(lease_duration)
+        case "adaptive":
+            return AdaptivePolicy(
+                base_eta=max(45.0, eta_threshold * 1.5),
+                slack_threshold=0.35,
+                aging_rate=0.4,
+                lease_slack=max(35.0, lease_duration / 8.0),
+            )
         case _:
             raise ValueError(
-                f"unknown policy {name!r}; expected null, radius, eta, or lease"
+                f"unknown policy {name!r}; expected null, radius, eta, lease, or adaptive"
             )

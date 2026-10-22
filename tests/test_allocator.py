@@ -7,6 +7,7 @@ import pytest
 
 from warehouse_allocator.alloc.allocator import Allocator
 from warehouse_allocator.alloc.policies import (
+    AdaptivePolicy,
     AdmissionDecision,
     AdmissionPolicy,
     ETAPolicy,
@@ -455,6 +456,7 @@ class TestPolicies:
             ("radius", RadiusPolicy),
             ("eta", ETAPolicy),
             ("lease", LeasePolicy),
+            ("adaptive", AdaptivePolicy),
         ],
     )
     def test_build_policy(self, name: str, expected: type[AdmissionPolicy]) -> None:
@@ -469,6 +471,89 @@ class TestPolicies:
         """An unknown policy name must fail loudly."""
         with pytest.raises(ValueError, match="unknown policy"):
             build_policy("nope", radius=1.0, eta_threshold=1.0, lease_duration=1.0)
+
+
+class TestAdaptivePolicy:
+    """Closed-loop feedback control, dual regimes, aging, and feasible leases."""
+
+    def test_slack_regime_admits_far_robot(self) -> None:
+        """When contention is low (slack), admission behaves liberally like null."""
+        config = CONFIG.evolve(obstacle_density=0.0, grid_width=40, grid_height=30)
+        world = World(config, RNGProvider(1), wander_when_idle=False)
+        clock = SimClock(config.dt)
+        policy = AdaptivePolicy(base_eta=10.0, slack_threshold=0.35)
+        robot = world.robots[0]
+        robot.position = (35.0, 25.0)
+        target = world.resources[0]
+        target.position = (5.0, 5.0)
+
+        # Clear holders so contention is 0.0
+        for r in world.resources:
+            r.holders.clear()
+            r.occupants.clear()
+
+        decision = policy.should_admit(robot, target, world, clock)
+        assert decision.admitted
+        assert "slack regime" in decision.reason
+        assert decision.lease_deadline is not None
+
+    def test_congested_regime_throttles_far_robot(self) -> None:
+        """When contention is high, faraway robot is deferred."""
+        config = CONFIG.evolve(obstacle_density=0.0, grid_width=40, grid_height=30)
+        world = World(config, RNGProvider(1), wander_when_idle=False)
+        clock = SimClock(config.dt)
+        policy = AdaptivePolicy(base_eta=10.0, slack_threshold=0.2)
+        robot = world.robots[0]
+        robot.position = (35.0, 25.0)
+        target = world.resources[0]
+        target.position = (5.0, 5.0)
+
+        # Force high contention: resources claimed but empty and robots waiting
+        for r in world.resources:
+            r.holders.add(99)
+            r.occupants.clear()
+        for r in world.robots:
+            r.state = RobotState.WAITING
+
+        # Prime EMA contention to high
+        for _ in range(15):
+            policy.should_admit(robot, target, world, clock)
+
+        decision = policy.should_admit(robot, target, world, clock)
+        assert not decision.admitted
+        assert "congested defer" in decision.reason
+
+    def test_anti_starvation_aging_eventually_admits(self) -> None:
+        """Accumulated wait time discounts ETA and breaks starvation."""
+        config = CONFIG.evolve(obstacle_density=0.0, grid_width=40, grid_height=30)
+        world = World(config, RNGProvider(1), wander_when_idle=False)
+        clock = SimClock(config.dt)
+        policy = AdaptivePolicy(base_eta=20.0, slack_threshold=0.2, aging_rate=1.0)
+        robot = world.robots[0]
+        robot.position = (25.0, 5.0)
+        target = world.resources[0]
+        target.position = (5.0, 5.0)
+
+        for r in world.resources:
+            r.holders.add(99)
+            r.occupants.clear()
+        for r in world.robots:
+            r.state = RobotState.WAITING
+
+        policy._ema_contention = 0.8
+
+        # Initial request: deferred
+        dec1 = policy.should_admit(robot, target, world, clock)
+        assert not dec1.admitted
+
+        # Advance clock by 100 seconds (2000 ticks of dt=0.05)
+        for _ in range(2000):
+            clock.tick()
+
+        # Subsequent request with aging discount
+        dec2 = policy.should_admit(robot, target, world, clock)
+        assert dec2.admitted
+        assert "aged" in dec2.reason
 
 
 class TestDecisionLog:

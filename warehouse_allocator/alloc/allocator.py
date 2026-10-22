@@ -183,6 +183,7 @@ class Allocator:
                 )
             )
             reason = f"force-admitted after {deferrals} deferrals"
+            lease_deadline = None
         else:
             decision = self.policy.should_admit(
                 robot, candidate, self.world, self.clock
@@ -193,6 +194,7 @@ class Allocator:
                 )
                 return None
             reason = decision.reason
+            lease_deadline = decision.lease_deadline
 
         request_vector = self.state.request_vector(resource_class)
 
@@ -212,7 +214,15 @@ class Allocator:
             self._defer(key, task, resource_class, "unsafe state", "refused_unsafe")
             return None
 
-        return self._grant(robot, candidate, task, deferrals, forced, reason)
+        return self._grant(
+            robot,
+            candidate,
+            task,
+            deferrals,
+            forced,
+            reason,
+            lease_deadline=lease_deadline,
+        )
 
     def _grant(
         self,
@@ -222,6 +232,7 @@ class Allocator:
         deferrals: int,
         forced: bool,
         reason: str,
+        lease_deadline: float | None = None,
     ) -> Resource:
         """Commit a grant to matrices, entities, leases, and the log.
 
@@ -232,6 +243,7 @@ class Allocator:
             deferrals: Deferrals this request accumulated.
             forced: Whether the admission policy was bypassed.
             reason: Justification for the log.
+            lease_deadline: Optional arrival deadline for lease tracking.
 
         Returns:
             The bound resource.
@@ -257,8 +269,11 @@ class Allocator:
             )
         )
 
-        if isinstance(self.policy, LeasePolicy):
+        deadline = lease_deadline
+        if deadline is None and isinstance(self.policy, LeasePolicy):
             deadline = now + self.policy.duration
+
+        if deadline is not None:
             self.leases.grant(
                 Lease(
                     robot_id=robot.robot_id,

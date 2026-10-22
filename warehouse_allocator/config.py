@@ -59,11 +59,11 @@ class SimConfig:
         seed: Master seed. All stochastic draws derive from this via
             :class:`~warehouse_allocator.core.rng.RNGProvider`.
         policy: Admission policy name; one of ``null``, ``radius``, ``eta``,
-            ``lease``. Consumed from Stage 3 onward.
+            ``lease``, ``adaptive``. Consumed from Stage 3 onward.
         radius: ``RadiusPolicy`` admission threshold in metres. Euclidean
             distance beyond this defers the request.
         eta_threshold: ``ETAPolicy`` admission threshold in simulated seconds
-            of A* travel time.
+            of A* travel time. Also used as base ETA for ``AdaptivePolicy``.
         lease_duration: ``LeasePolicy`` arrival deadline in simulated seconds.
             A holder that has not arrived by then is revoked.
         max_deferrals: Deferrals a request may accumulate before it is
@@ -77,6 +77,8 @@ class SimConfig:
         robot_speed: Robot travel speed in metres per simulated second.
         battery_drain_rate: Battery fraction consumed per simulated second
             while moving, in units of ``[0, 1]`` capacity per second.
+        burst_interval: Simulated seconds between burst arrivals (0.0 to disable).
+        burst_size: Number of concurrent tasks arriving per burst (0 to disable).
     """
 
     grid_width: int = 100
@@ -98,6 +100,8 @@ class SimConfig:
     service_duration_mean: float = 18.0
     robot_speed: float = 1.5
     battery_drain_rate: float = 0.0015
+    burst_interval: float = 0.0
+    burst_size: int = 0
 
     def __post_init__(self) -> None:
         """Reject configurations that cannot produce a meaningful run.
@@ -130,6 +134,10 @@ class SimConfig:
             raise ValueError("robot_speed must be positive")
         if self.battery_drain_rate < 0.0:
             raise ValueError("battery_drain_rate must be non-negative")
+        if self.burst_interval < 0.0:
+            raise ValueError("burst_interval must be non-negative")
+        if self.burst_size < 0:
+            raise ValueError("burst_size must be non-negative")
         # A robot that covers more than one cell per tick can tunnel through a
         # one-cell-thick obstacle wall, which would silently invalidate every
         # path-cost measurement the experiment depends on.

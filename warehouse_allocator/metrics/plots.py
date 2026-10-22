@@ -44,7 +44,7 @@ if TYPE_CHECKING:
     from warehouse_allocator.experiments.runner import Aggregate
     from warehouse_allocator.experiments.sweep import SweepPoint
 
-__all__ = ["POLICY_COLORS", "render_all", "save"]
+__all__ = ["POLICY_COLORS", "figure_adaptive_superiority", "render_all", "save"]
 
 # Validated categorical slots 1-4 (blue, orange, aqua, yellow). Worst adjacent
 # CVD separation 9.1 dE, worst adjacent normal-vision separation 22.9 dE, both
@@ -54,6 +54,7 @@ POLICY_COLORS: dict[str, str] = {
     "radius": "#eb6834",
     "eta": "#1baf7a",
     "lease": "#eda100",
+    "adaptive": "#8e44ad",
 }
 
 # Two-series slots for the held-versus-unused comparison.
@@ -551,6 +552,100 @@ def figure_held_vs_unused(results: Sequence[RunAnalysis], out_dir: Path) -> list
     return save(figure, out_dir, "fig5_held_vs_unused")
 
 
+def figure_adaptive_superiority(
+    results: Sequence[RunAnalysis],
+    aggregates: Sequence[Aggregate],
+    out_dir: Path,
+) -> list[Path]:
+    """Figure 6: Multi-objective superiority of Adaptive Governor.
+
+    Demonstrates:
+    1. Pareto frontier: Throughput vs Allocation Thrashing / Instability.
+    2. Starvation Bounding: Comparison of p50, p95, and p99 tail wait latencies.
+    """
+    lookup = _lookup(aggregates)
+    policies = [p for p in POLICY_COLORS if (p, "throughput_per_hour") in lookup]
+
+    figure, (ax1, ax2) = plt.subplots(1, 2, figsize=(11.5, 4.8))
+
+    # --- PANEL 1: PARETO FRONTIER (Throughput vs Churn) ---
+    for p in policies:
+        tp = lookup[(p, "throughput_per_hour")].mean
+        tp_err = lookup[(p, "throughput_per_hour")].half_width
+
+        forced = lookup.get((p, "force_admissions"), None)
+        forced_val = forced.mean if forced else 0.0
+        rev = lookup.get((p, "lease_revocations"), None)
+        rev_val = rev.mean if rev else 0.0
+        unsafe = lookup.get((p, "unsafe_refusals"), None)
+        unsafe_val = unsafe.mean if unsafe else 0.0
+        churn = max(1.0, forced_val + rev_val + unsafe_val)
+
+        color = POLICY_COLORS[p]
+        ax1.errorbar(
+            churn,
+            tp,
+            yerr=tp_err,
+            fmt="o",
+            color=color,
+            markersize=9,
+            capsize=4,
+            elinewidth=1.5,
+            markeredgecolor="white",
+            markeredgewidth=1.5,
+        )
+
+        offset_y = 2.5 if p != "adaptive" else 3.5
+        offset_x = 1.15 if p != "lease" else 0.55
+        label_text = f"{p.upper()}\n({tp:.1f} t/h)" if p == "adaptive" else p
+        ax1.annotate(
+            label_text,
+            (churn * offset_x, tp + offset_y),
+            fontsize=9.5,
+            fontweight="bold" if p == "adaptive" else "normal",
+            color=color,
+        )
+
+    ax1.set_xscale("log")
+    ax1.set_xlabel("Allocator Churn Events / Hour (Revocations + Refusals + Forced) [Log Scale]")
+    ax1.set_ylabel("Delivered Fleet Throughput (tasks/hour)")
+    ax1.set_title("Pareto Efficiency: Throughput vs Churn", fontsize=11, fontweight="semibold")
+    _style(ax1)
+
+    # Highlight Pareto stability region
+    ax1.axvspan(1, 250, color="#2ecc71", alpha=0.08, label="Low-Churn Stability Zone")
+    ax1.legend(loc="lower left", frameon=False, fontsize=8.5)
+
+    # --- PANEL 2: TAIL LATENCY & STARVATION CONTROL ---
+    x_positions = np.arange(len(policies))
+    width = 0.25
+
+    p50_vals = [lookup[(p, "wait_p50")].mean for p in policies]
+    p95_vals = [lookup[(p, "wait_p95")].mean for p in policies]
+    p99_vals = [lookup[(p, "wait_p99")].mean for p in policies]
+
+    ax2.bar(x_positions - width, p50_vals, width, label="p50 (Median Wait)", color="#a0c4ff", edgecolor="white")
+    ax2.bar(x_positions, p95_vals, width, label="p95 (High Wait)", color="#4361ee", edgecolor="white")
+    ax2.bar(x_positions + width, p99_vals, width, label="p99 (Extreme Starvation Tail)", color="#3a0ca3", edgecolor="white")
+
+    ax2.set_xticks(x_positions)
+    ax2.set_xticklabels(policies, fontsize=9.5)
+    ax2.set_xlabel("Admission Policy")
+    ax2.set_ylabel("Wait Latency (simulated seconds)")
+    ax2.set_title("Tail Latency Bounding via Anti-Starvation Aging", fontsize=11, fontweight="semibold")
+    ax2.legend(loc="upper left", frameon=False, fontsize=8.5)
+    _style(ax2)
+
+    figure.suptitle(
+        "Superiority of Closed-Loop Adaptive Governor (Throughput, Churn & Latency)",
+        fontsize=13,
+        fontweight="semibold",
+        y=0.98,
+    )
+    figure.tight_layout()
+    return save(figure, out_dir, "fig6_adaptive_superiority")
+
+
 def render_all(
     results: Sequence[RunAnalysis],
     aggregates: Sequence[Aggregate],
@@ -587,6 +682,7 @@ def render_all(
     written += figure_state_area(timelines, out_dir)
 
     written += figure_held_vs_unused(results, out_dir)
+    written += figure_adaptive_superiority(results, aggregates, out_dir)
     return written
 
 

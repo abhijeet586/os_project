@@ -44,7 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--policy",
         default="null",
-        choices=["null", "radius", "eta", "lease"],
+        choices=["null", "radius", "eta", "lease", "adaptive"],
         help="admission policy (default: null, the classical baseline)",
     )
     parser.add_argument("--seed", type=int, default=42, help="master seed")
@@ -68,6 +68,12 @@ def build_parser() -> argparse.ArgumentParser:
     fleet.add_argument("--service-mean", type=float, default=None)
     fleet.add_argument("--battery-drain", type=float, default=None)
     fleet.add_argument("--dt", type=float, default=None, help="fixed timestep")
+    fleet.add_argument(
+        "--burst-interval", type=float, default=None, help="seconds between burst waves"
+    )
+    fleet.add_argument(
+        "--burst-size", type=int, default=None, help="tasks per burst wave"
+    )
 
     policy = parser.add_argument_group("policy parameters")
     policy.add_argument("--radius", type=float, default=None, help="metres")
@@ -110,6 +116,8 @@ def _overrides(args: argparse.Namespace) -> dict[str, Any]:
         "eta_threshold": args.eta_threshold,
         "lease_duration": args.lease_duration,
         "max_deferrals": args.max_deferrals,
+        "burst_interval": args.burst_interval,
+        "burst_size": args.burst_size,
     }
     overrides: dict[str, Any] = {
         "policy": args.policy,

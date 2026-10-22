@@ -31,7 +31,7 @@ if TYPE_CHECKING:
 
 __all__ = ["POLICY_CYCLE", "SPEEDS", "LiveControls"]
 
-POLICY_CYCLE: Final[tuple[str, ...]] = ("null", "radius", "eta", "lease")
+POLICY_CYCLE: Final[tuple[str, ...]] = ("null", "radius", "eta", "lease", "adaptive")
 
 # Speed multipliers. 0 is pause; the last entry runs headless-fast, advancing
 # many simulation steps per rendered frame.

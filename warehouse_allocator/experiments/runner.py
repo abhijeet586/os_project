@@ -41,7 +41,7 @@ __all__ = [
     "write_csv",
 ]
 
-POLICIES: tuple[str, ...] = ("null", "radius", "eta", "lease")
+POLICIES: tuple[str, ...] = ("null", "radius", "eta", "lease", "adaptive")
 
 # Below five seeds a t-interval is so wide as to be meaningless, and the spec
 # forbids reporting single-seed results at all.
