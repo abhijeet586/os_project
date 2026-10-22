@@ -16,7 +16,11 @@ count.
 from __future__ import annotations
 
 from warehouse_allocator.alloc.leases import Lease, LeaseBook
-from warehouse_allocator.alloc.policies import AdmissionPolicy, LeasePolicy
+from warehouse_allocator.alloc.policies import (
+    AdmissionDecision,
+    AdmissionPolicy,
+    LeasePolicy,
+)
 from warehouse_allocator.alloc.safety import SafetyChecker
 from warehouse_allocator.alloc.state import ResourceState
 from warehouse_allocator.core.clock import SimClock
@@ -167,6 +171,7 @@ class Allocator:
             return None
 
         forced = deferrals > self.max_deferrals
+        decision: AdmissionDecision | None = None
         if forced:
             # Force-admission skips the ADMISSION POLICY ONLY. The safety
             # check below is still executed, unconditionally. Bypassing it
@@ -183,7 +188,6 @@ class Allocator:
                 )
             )
             reason = f"force-admitted after {deferrals} deferrals"
-            lease_deadline = None
         else:
             decision = self.policy.should_admit(
                 robot, candidate, self.world, self.clock
@@ -194,7 +198,6 @@ class Allocator:
                 )
                 return None
             reason = decision.reason
-            lease_deadline = decision.lease_deadline
 
         request_vector = self.state.request_vector(resource_class)
 
@@ -214,15 +217,7 @@ class Allocator:
             self._defer(key, task, resource_class, "unsafe state", "refused_unsafe")
             return None
 
-        return self._grant(
-            robot,
-            candidate,
-            task,
-            deferrals,
-            forced,
-            reason,
-            lease_deadline=lease_deadline,
-        )
+        return self._grant(robot, candidate, task, deferrals, forced, reason, decision)
 
     def _grant(
         self,
@@ -232,7 +227,7 @@ class Allocator:
         deferrals: int,
         forced: bool,
         reason: str,
-        lease_deadline: float | None = None,
+        decision: AdmissionDecision | None = None,
     ) -> Resource:
         """Commit a grant to matrices, entities, leases, and the log.
 
@@ -243,7 +238,7 @@ class Allocator:
             deferrals: Deferrals this request accumulated.
             forced: Whether the admission policy was bypassed.
             reason: Justification for the log.
-            lease_deadline: Optional arrival deadline for lease tracking.
+            decision: Optional admission decision that approved the grant.
 
         Returns:
             The bound resource.
@@ -269,8 +264,10 @@ class Allocator:
             )
         )
 
-        deadline = lease_deadline
-        if deadline is None and isinstance(self.policy, LeasePolicy):
+        deadline: float | None = None
+        if decision is not None and decision.lease_deadline is not None:
+            deadline = decision.lease_deadline
+        elif isinstance(self.policy, LeasePolicy):
             deadline = now + self.policy.duration
 
         if deadline is not None:

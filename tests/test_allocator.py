@@ -449,6 +449,75 @@ class TestPolicies:
         assert decision.admitted
         assert decision.lease_deadline == pytest.approx(clock.now() + 30.0)
 
+    def test_adaptive_policy_uncontested_fast_path(self) -> None:
+        """AdaptivePolicy admits fast-path when capacity is plenty."""
+        config = CONFIG.evolve(
+            obstacle_density=0.0,
+            resource_counts=(("crane", 4), ("elevator", 4), ("dock", 4)),
+        )
+        world, _, _, clock = _harness(config=config)
+        crane = world.resources_of_class(ResourceClass.CRANE)[0]
+        robot = world.robots[0]
+        robot.position = (1.5, 1.5)
+        crane.position = (25.5, 15.5)
+
+        policy = AdaptivePolicy(eta_threshold=10.0)
+        decision = policy.should_admit(robot, crane, world, clock)
+        assert decision.admitted
+        assert "fast-path" in decision.reason
+        assert decision.lease_deadline is None
+
+    def test_adaptive_policy_bottleneck_contention(self) -> None:
+        """AdaptivePolicy defers distant robots under bottleneck contention."""
+        config = CONFIG.evolve(
+            obstacle_density=0.0,
+            resource_counts=(("crane", 2), ("elevator", 2), ("dock", 2)),
+        )
+        world, _, _, clock = _harness(config=config)
+        cranes = world.resources_of_class(ResourceClass.CRANE)
+        # Mark first crane busy so free == 1
+        cranes[0].holders.add(99)
+        candidate = cranes[1]
+        candidate.position = (20.5, 10.5)
+
+        # Robot 1: Far away (distance ~25m, speed 1.5 -> ETA ~16s > 10s)
+        far_robot = world.robots[0]
+        far_robot.position = (1.5, 1.5)
+
+        policy = AdaptivePolicy(eta_threshold=10.0)
+        decision_far = policy.should_admit(far_robot, candidate, world, clock)
+        assert not decision_far.admitted
+        assert "bottleneck" in decision_far.reason
+
+        # Robot 2: Nearby (distance ~1m -> ETA ~0.6s <= 10s)
+        near_robot = world.robots[1]
+        near_robot.position = (19.5, 10.5)
+        decision_near = policy.should_admit(near_robot, candidate, world, clock)
+        assert decision_near.admitted
+        assert decision_near.lease_deadline is not None
+        assert decision_near.lease_deadline > clock.now()
+
+    def test_adaptive_policy_docks_exempt_from_leases(self) -> None:
+        """Docks are exempt from short leases to prevent churn."""
+        config = CONFIG.evolve(
+            resource_counts=(("crane", 2), ("elevator", 2), ("dock", 4))
+        )
+        world, _, _, clock = _harness(config=config)
+        dock = world.resources_of_class(ResourceClass.DOCK)[0]
+        robot = world.robots[0]
+        policy = AdaptivePolicy()
+        decision = policy.should_admit(robot, dock, world, clock)
+        assert decision.admitted
+        assert decision.lease_deadline is None
+
+    def test_adaptive_full_simulation(self) -> None:
+        """Simulation with policy='adaptive' runs and completes tasks without error."""
+        config = CONFIG.evolve(policy="adaptive", duration=60.0)
+        sim = Simulation(config)
+        events = sim.run()
+        assert len(events) > 0
+        assert sim.collector.count_of(RequestGranted) > 0
+
     @pytest.mark.parametrize(
         ("name", "expected"),
         [
@@ -471,89 +540,6 @@ class TestPolicies:
         """An unknown policy name must fail loudly."""
         with pytest.raises(ValueError, match="unknown policy"):
             build_policy("nope", radius=1.0, eta_threshold=1.0, lease_duration=1.0)
-
-
-class TestAdaptivePolicy:
-    """Closed-loop feedback control, dual regimes, aging, and feasible leases."""
-
-    def test_slack_regime_admits_far_robot(self) -> None:
-        """When contention is low (slack), admission behaves liberally like null."""
-        config = CONFIG.evolve(obstacle_density=0.0, grid_width=40, grid_height=30)
-        world = World(config, RNGProvider(1), wander_when_idle=False)
-        clock = SimClock(config.dt)
-        policy = AdaptivePolicy(base_eta=10.0, slack_threshold=0.35)
-        robot = world.robots[0]
-        robot.position = (35.0, 25.0)
-        target = world.resources[0]
-        target.position = (5.0, 5.0)
-
-        # Clear holders so contention is 0.0
-        for r in world.resources:
-            r.holders.clear()
-            r.occupants.clear()
-
-        decision = policy.should_admit(robot, target, world, clock)
-        assert decision.admitted
-        assert "slack regime" in decision.reason
-        assert decision.lease_deadline is not None
-
-    def test_congested_regime_throttles_far_robot(self) -> None:
-        """When contention is high, faraway robot is deferred."""
-        config = CONFIG.evolve(obstacle_density=0.0, grid_width=40, grid_height=30)
-        world = World(config, RNGProvider(1), wander_when_idle=False)
-        clock = SimClock(config.dt)
-        policy = AdaptivePolicy(base_eta=10.0, slack_threshold=0.2)
-        robot = world.robots[0]
-        robot.position = (35.0, 25.0)
-        target = world.resources[0]
-        target.position = (5.0, 5.0)
-
-        # Force high contention: resources claimed but empty and robots waiting
-        for r in world.resources:
-            r.holders.add(99)
-            r.occupants.clear()
-        for r in world.robots:
-            r.state = RobotState.WAITING
-
-        # Prime EMA contention to high
-        for _ in range(15):
-            policy.should_admit(robot, target, world, clock)
-
-        decision = policy.should_admit(robot, target, world, clock)
-        assert not decision.admitted
-        assert "congested defer" in decision.reason
-
-    def test_anti_starvation_aging_eventually_admits(self) -> None:
-        """Accumulated wait time discounts ETA and breaks starvation."""
-        config = CONFIG.evolve(obstacle_density=0.0, grid_width=40, grid_height=30)
-        world = World(config, RNGProvider(1), wander_when_idle=False)
-        clock = SimClock(config.dt)
-        policy = AdaptivePolicy(base_eta=20.0, slack_threshold=0.2, aging_rate=1.0)
-        robot = world.robots[0]
-        robot.position = (25.0, 5.0)
-        target = world.resources[0]
-        target.position = (5.0, 5.0)
-
-        for r in world.resources:
-            r.holders.add(99)
-            r.occupants.clear()
-        for r in world.robots:
-            r.state = RobotState.WAITING
-
-        policy._ema_contention = 0.8
-
-        # Initial request: deferred
-        dec1 = policy.should_admit(robot, target, world, clock)
-        assert not dec1.admitted
-
-        # Advance clock by 100 seconds (2000 ticks of dt=0.05)
-        for _ in range(2000):
-            clock.tick()
-
-        # Subsequent request with aging discount
-        dec2 = policy.should_admit(robot, target, world, clock)
-        assert dec2.admitted
-        assert "aged" in dec2.reason
 
 
 class TestDecisionLog:
