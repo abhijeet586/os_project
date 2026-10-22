@@ -188,31 +188,6 @@ def generate_trace(
         )
         task_id += 1
 
-    if config.burst_interval > 0.0 and config.burst_size > 0:
-        burst_stream = rng.fresh("burst_gen")
-        burst_time = config.burst_interval
-        while burst_time < config.duration:
-            for _ in range(config.burst_size):
-                template = templates[int(burst_stream.choice(len(templates), p=weights))]
-                pickup = free_cells[int(burst_stream.integers(0, len(free_cells)))]
-                dropoff = free_cells[int(burst_stream.integers(0, len(free_cells)))]
-                service = float(np.clip(burst_stream.exponential(mean_service), lower, upper))
-                tasks.append(
-                    Task(
-                        task_id=task_id,
-                        template=TaskTemplate(template),
-                        pickup=pickup,
-                        dropoff=dropoff,
-                        service_duration=service,
-                        created_at=burst_time,
-                    )
-                )
-                task_id += 1
-            burst_time += config.burst_interval
-        tasks.sort(key=lambda t: t.created_at)
-        for idx, task in enumerate(tasks):
-            task.task_id = idx
-
     return TaskTrace(
         seed=config.seed,
         duration=config.duration,

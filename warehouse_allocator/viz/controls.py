@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Final
 import pygame
 
 from warehouse_allocator.alloc.policies import (
+    AdaptivePolicy,
     ETAPolicy,
     LeasePolicy,
     RadiusPolicy,
@@ -31,7 +32,13 @@ if TYPE_CHECKING:
 
 __all__ = ["POLICY_CYCLE", "SPEEDS", "LiveControls"]
 
-POLICY_CYCLE: Final[tuple[str, ...]] = ("null", "radius", "eta", "lease", "adaptive")
+POLICY_CYCLE: Final[tuple[str, ...]] = (
+    "null",
+    "radius",
+    "eta",
+    "lease",
+    "adaptive",
+)
 
 # Speed multipliers. 0 is pause; the last entry runs headless-fast, advancing
 # many simulation steps per rendered frame.
@@ -225,7 +232,7 @@ class LiveControls:
         previous = self.radius
         self.radius = max(1.0, self.radius + delta)
         policy = self.simulation.allocator.policy
-        if isinstance(policy, RadiusPolicy):
+        if isinstance(policy, (RadiusPolicy, AdaptivePolicy)):
             policy.radius = self.radius
         self._mark("radius", previous, self.radius)
 
@@ -238,7 +245,7 @@ class LiveControls:
         previous = self.eta_threshold
         self.eta_threshold = max(1.0, self.eta_threshold + delta)
         policy = self.simulation.allocator.policy
-        if isinstance(policy, ETAPolicy):
+        if isinstance(policy, (ETAPolicy, AdaptivePolicy)):
             policy.threshold = self.eta_threshold
         self._mark("eta_threshold", previous, self.eta_threshold)
 
@@ -251,7 +258,7 @@ class LiveControls:
         previous = self.lease_duration
         self.lease_duration = max(5.0, self.lease_duration + delta)
         policy = self.simulation.allocator.policy
-        if isinstance(policy, LeasePolicy):
+        if isinstance(policy, (LeasePolicy, AdaptivePolicy)):
             policy.duration = self.lease_duration
         self._mark("lease_duration", previous, self.lease_duration)
 
